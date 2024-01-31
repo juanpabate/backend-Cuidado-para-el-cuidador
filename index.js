@@ -152,10 +152,10 @@ app.post('/foro/respuestas', (req, res) => {
 
 //ENDPOINT REGISTRAR USUARIO
 app.post('/register', (req, res)=>{
-  const {user, password, email}= req.body;
+  const {nombre, apellido, contrasena, email}= req.body;
 
-  const sql= 'INSERT INTO usuarios (nombre_usuario, contrasena, correo_electronico) VALUES (?, ?, ?)';
-  db.query(sql, [user, password, email], (err, result)=>{
+  const sql= 'INSERT INTO usuarios (nombre, apellido, correo_electronico, contrasena) VALUES (?, ?, ?, ?)';
+  db.query(sql, [nombre, apellido, contrasena, email], (err, result)=>{
     if(err){
       console.error('Error al insertar en la base de datos:', err);
       res.status(500).json({ success: false, error: 'Error al insertar en la base de datos' });
