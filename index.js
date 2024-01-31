@@ -155,7 +155,7 @@ app.post('/register', (req, res)=>{
   const {nombre, apellido, contrasena, email}= req.body;
 
   const sql= 'INSERT INTO usuarios (nombre, apellido, correo_electronico, contrasena) VALUES (?, ?, ?, ?)';
-  db.query(sql, [nombre, apellido, contrasena, email], (err, result)=>{
+  db.query(sql, [nombre, apellido, email, contrasena], (err, result)=>{
     if(err){
       console.error('Error al insertar en la base de datos:', err);
       res.status(500).json({ success: false, error: 'Error al insertar en la base de datos' });
