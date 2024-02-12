@@ -437,3 +437,141 @@ app.put('/foro/editarPublicacion/:postId', (req, res) => {
     }
   });
 });
+
+// ENDPOINT PARA AGREGAR UNA NUEVA TAREA
+app.post('/agregarTarea', (req, res) => {
+  const { idUsuario, nombreTarea, Fecha, Hora, Lugar, Descripcion } = req.body;
+
+  if (!idUsuario || !nombreTarea || !Fecha || !Hora || !Lugar || !Descripcion) {
+    return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+  }
+
+  const sql = 'INSERT INTO tareas (idUsuario, nombreTarea, Fecha, Hora, Lugar, Descripcion) VALUES (?, ?, ?, ?, ?, ?)';
+
+  db.query(sql, [idUsuario, nombreTarea, Fecha, Hora, Lugar, Descripcion], (err, result) => {
+    if (err) {
+      console.error('Error al insertar nueva tarea:', err);
+      res.status(500).json({ success: false, error: 'Error al insertar en la base de datos' });
+    } else {
+      console.log('Tarea insertada correctamente');
+      res.status(200).json({ success: true, message: 'Tarea agregada correctamente' });
+    }
+  });
+});
+
+// ENDPOINT PARA OBTENER TODAS LAS TAREAS DE UN USUARIO
+app.get('/tareas/:idUsuario', (req, res) => {
+  const { idUsuario } = req.params;
+
+  // Obtener la fecha y hora actual
+  const now = new Date();
+
+  // Consulta SQL para obtener solo las tareas del usuario cuya fecha y hora son posteriores a la fecha y hora actuales
+  const sql = 'SELECT * FROM tareas WHERE idUsuario = ? AND (Fecha > ? OR (Fecha = ? AND Hora > ?)) ORDER BY Fecha, Hora ASC';
+
+  db.query(sql, [idUsuario, now, now, now], (err, result) => {
+    if (err) {
+      console.error('Error al obtener las tareas del usuario:', err);
+      res.status(500).send('Error interno del servidor');
+    } else {
+      res.json(result);
+    }
+  });
+});
+
+// ENDPOINT PARA OBTENER LAS MEDICINAS DE UN USUARIO
+app.get('/medicinas/:idUsuario', (req, res) => {
+  const { idUsuario } = req.params;
+
+  const sql = 'SELECT * FROM medicinas WHERE idUsuario = ?';
+
+  db.query(sql, [idUsuario], (err, result) => {
+    if (err) {
+      console.error('Error al obtener las medicinas del usuario:', err);
+      res.status(500).send('Error interno del servidor');
+    } else {
+      res.json(result);
+    }
+  });
+});
+
+// ENDPOINT PARA AGREGAR O ELIMINAR FECHA DE SUMINISTRO DE MEDICINA
+app.post('/medicina/agregarEliminarFechaSuministro', (req, res) => {
+  const { idMedicina, fechaHoy } = req.body;
+
+  // Verificar si se proporcionó el idMedicina en la solicitud
+  if (!idMedicina) {
+    return res.status(400).json({ error: 'Se requiere el ID de la medicina' });
+  }
+
+  // Obtener la fecha de hoy
+  // const fechaHoy = new Date().toISOString().slice(0, 10); // Formato YYYY-MM-DD
+  console.log(fechaHoy);
+
+  // Consultar la base de datos para obtener la medicina correspondiente
+  const sqlSelectMedicina = 'SELECT * FROM medicinas WHERE idMedicina = ?';
+
+  db.query(sqlSelectMedicina, [idMedicina], (err, result) => {
+    if (err) {
+      console.error('Error al obtener la medicina:', err);
+      return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'La medicina no existe' });
+    }
+
+    // Obtener las fechas suministradas de la medicina
+    const { fechaSuministrada } = result[0];
+    let fechasSuministradas = fechaSuministrada ? fechaSuministrada.split(',') : [];
+
+    // Verificar si la fecha de hoy ya está presente en la lista de fechas suministradas
+    const indexFechaHoy = fechasSuministradas.indexOf(fechaHoy);
+    if (indexFechaHoy !== -1) {
+      // Si la fecha de hoy está presente, elimínala de la lista
+      fechasSuministradas.splice(indexFechaHoy, 1);
+    } else {
+      // Si la fecha de hoy no está presente, agrégala a la lista
+      fechasSuministradas.push(fechaHoy);
+    }
+
+    // Actualizar las fechas suministradas en la base de datos
+    const sqlUpdateMedicina = 'UPDATE medicinas SET fechaSuministrada = ? WHERE idMedicina = ?';
+
+    db.query(sqlUpdateMedicina, [fechasSuministradas.join(','), idMedicina], (updateErr, updateResult) => {
+      if (updateErr) {
+        console.error('Error al actualizar las fechas suministradas:', updateErr);
+        return res.status(500).json({ error: 'Error interno del servidor' });
+      }
+
+      console.log('Fechas suministradas actualizadas correctamente');
+      return res.status(200).json({ message: 'Fechas suministradas actualizadas correctamente' });
+    });
+  });
+});
+
+// ENDPOINT PARA AGREGAR UNA NUEVA MEDICINA
+app.post('/medicina/agregar', (req, res) => {
+  const { idUsuario, nombreMedicina, fechaInicio, fechaFinalizacion, Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo, hora } = req.body;
+
+  if (!idUsuario || !nombreMedicina || !fechaInicio || hora === undefined || fechaFinalizacion === undefined ||
+    Lunes === undefined || Martes === undefined || Miercoles === undefined || Jueves === undefined ||
+    Viernes === undefined || Sabado === undefined || Domingo === undefined) {
+    return res.status(400).json({ error: 'Se requieren todos los campos obligatorios para agregar una nueva medicina' });
+  }
+
+  // Consulta SQL para insertar la nueva medicina en la base de datos
+  const sql = 'INSERT INTO medicinas (idUsuario, nombreMedicina, fechaInicio, fechaFinalizacion, Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo, hora) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+
+  // Ejecutar la consulta SQL
+  db.query(sql, [idUsuario, nombreMedicina, fechaInicio, fechaFinalizacion, Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo, hora], (err, result) => {
+    if (err) {
+      console.error('Error al insertar nueva medicina:', err);
+      res.status(500).json({ success: false, error: 'Error al insertar en la base de datos' });
+    } else {
+      console.log('Medicina insertada correctamente');
+      res.status(200).json({ success: true, message: 'Medicina agregada correctamente' });
+    }
+  });
+});
+
