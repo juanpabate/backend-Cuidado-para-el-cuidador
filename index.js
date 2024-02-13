@@ -1,6 +1,7 @@
 const express= require('express');
 const mysql= require('mysql');
 const cors= require('cors');
+const bcrypt = require('bcrypt');
 
 require('dotenv').config();
 
@@ -150,43 +151,67 @@ app.post('/foro/respuestas', (req, res) => {
 
 
 
-//ENDPOINT REGISTRAR USUARIO
-app.post('/register', (req, res)=>{
-  const {nombre, apellido, contrasena, email}= req.body;
+// ENDPOINT PARA REGISTRAR USUARIO
+app.post('/register', async (req, res) => {
+  const { nombre, apellido, contrasena, email } = req.body;
 
-  const sql= 'INSERT INTO usuarios (nombre, apellido, correo_electronico, contrasena) VALUES (?, ?, ?, ?)';
-  db.query(sql, [nombre, apellido, email, contrasena], (err, result)=>{
-    if(err){
-      console.error('Error al insertar en la base de datos:', err);
-      res.status(500).json({ success: false, error: 'Error al insertar en la base de datos' });
-    }else{
-      console.log('Usuario insertado correctamente');
-      res.status(200).json({ success: true, message: 'Usuario registrado correctamente' });
-    }
-  })
+  try {
+    // Generar un hash de la contraseña antes de almacenarla en la base de datos
+    const hashedPassword = await bcrypt.hash(contrasena, 10); // El segundo argumento es el costo del hash (salt)
+
+    const sql = 'INSERT INTO usuarios (nombre, apellido, correo_electronico, contrasena) VALUES (?, ?, ?, ?)';
+    db.query(sql, [nombre, apellido, email, hashedPassword], (err, result) => {
+      if (err) {
+        console.error('Error al insertar en la base de datos:', err);
+        res.status(500).json({ success: false, error: 'Error al insertar en la base de datos' });
+      } else {
+        console.log('Usuario insertado correctamente');
+        res.status(200).json({ success: true, message: 'Usuario registrado correctamente' });
+      }
+    });
+  } catch (error) {
+    console.error('Error al generar hash de contraseña:', error);
+    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+  }
 });
 
-//ENDPOINT DE LOGEO
-app.post('/login', (req, res)=>{
-  const {email, password}= req.body;
+// ENDPOINT DE LOGEO
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
 
-  const sql= 'SELECT * FROM usuarios WHERE correo_electronico= ? AND contrasena= ?';
-
-  db.query(sql, [email, password], (err, result)=>{
-    if(err){
-      console.error('Error al verificar las credenciales', err);
-      res.status(500).json({ success: false, error: 'Error interno del servidor' });
-    }else{
-      if (result.length > 0) {
-        // Credenciales válidas
-        const usuario= result[0];
-        res.status(200).json({ success: true, message: 'Inicio de sesión exitoso', usuario });
+  try {
+    // Obtener el hash de la contraseña almacenada en la base de datos
+    const sql = 'SELECT * FROM usuarios WHERE correo_electronico = ?';
+    db.query(sql, [email], async (err, result) => {
+      if (err) {
+        console.error('Error al verificar las credenciales:', err);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
       } else {
-        // Credenciales no válidas
-        res.status(401).json({ success: false, error: 'Credenciales no válidas desde el back' });
+        if (result.length > 0) {
+          // Usuario encontrado
+          const usuario = result[0];
+          const hashedPassword = usuario.contrasena;
+
+          // Comparar la contraseña proporcionada con el hash almacenado
+          const passwordMatch = await bcrypt.compare(password, hashedPassword);
+
+          if (passwordMatch) {
+            // Contraseña válida, inicio de sesión exitoso
+            res.status(200).json({ success: true, message: 'Inicio de sesión exitoso', usuario });
+          } else {
+            // Contraseña incorrecta
+            res.status(401).json({ success: false, error: 'Credenciales no válidas' });
+          }
+        } else {
+          // Usuario no encontrado
+          res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+        }
       }
-    }
-  })
+    });
+  } catch (error) {
+    console.error('Error al verificar las credenciales:', error);
+    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+  }
 });
 
 // ENDPOINT PARA OBTENER FAVORITOS POR USUARIO
